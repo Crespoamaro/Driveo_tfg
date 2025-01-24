@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "329588530863",
+    "project_id": "driveotfg",
+    "storage_bucket": "driveotfg.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329588530863:android:645cce7c801e95aefdfe5a",
+        "android_client_info": {
+          "package_name": "com.example.driveo_tfg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqs7oi77X5Ds6sNGyTMT1glrfeikA8l2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
