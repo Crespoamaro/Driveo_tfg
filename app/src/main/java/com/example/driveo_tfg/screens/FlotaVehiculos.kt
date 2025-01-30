@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,27 +15,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.driveo_tfg.R
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlotaVehiculos() {
-    val yellowColor = Color(0xFFF7FF62) // Amarillo F7FF62
+fun FlotaVehiculos(navController: NavHostController) {
+    val yellowColor = Color(0xFFF7FF62)
+    val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
+    var vehiculos by remember { mutableStateOf<List<Vehiculo>>(emptyList()) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showDialog by remember { mutableStateOf(false) }
+    var selectedVehiculo by remember { mutableStateOf<Vehiculo?>(null) }
 
-    // Simulación de datos
-    val vehiculos = List(10) {
-        Vehiculo(
-            nombre = "Juan Antonio Gutierrez",
-            matricula = "2541 MVZ",
-            combustible = "Gasolina",
-            horas = "8 horas"
-        )
+    LaunchedEffect(Unit) {
+        db.collection("vehiculos")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                vehiculos = snapshot?.toObjects(Vehiculo::class.java) ?: emptyList()
+            }
     }
 
     Scaffold(
@@ -53,6 +59,14 @@ fun FlotaVehiculos() {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = yellowColor)
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("AgregarVehiculo") },
+                containerColor = yellowColor
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Agregar vehículo")
+            }
+        },
         content = { paddingValues ->
             Column(
                 modifier = Modifier
@@ -60,90 +74,101 @@ fun FlotaVehiculos() {
                     .padding(paddingValues)
                     .background(Color.White)
             ) {
-                // Filtros
+                // Barra de búsqueda
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    listOf("Uber", "Cabify", "Bolt", "Taxi").forEach { filtro ->
-                        Button(
-                            onClick = { /* Acción de filtro */ },
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                        ) {
-                            Text(text = filtro, color = Color.Black, fontSize = 12.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Barra de título y búsqueda
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Flota de Vehículos",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.Black
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Agregar",
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        BasicTextField(
-                            value = "",
-                            onValueChange = {},
-                            modifier = Modifier
-                                .background(
-                                    color = Color(0xFFF1F1F1),
-                                    shape = RoundedCornerShape(10.dp)
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                color = Color(0xFFF1F1F1),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.Black, fontSize = 14.sp),
+                        decorationBox = { innerTextField ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Buscar"
                                 )
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .width(120.dp),
-                            singleLine = true,
-                            textStyle = TextStyle(color = Color.Black, fontSize = 14.sp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Buscar"
-                        )
-                    }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                innerTextField()
+                            }
+                        }
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 // Lista de vehículos
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(vehiculos) { vehiculo ->
-                        VehiculoCard(vehiculo = vehiculo)
+                    items(vehiculos.filter {
+                        it.matricula.contains(searchQuery, true) ||
+                                it.nombre.contains(searchQuery, true) ||
+                                it.plataforma.contains(searchQuery, true)
+                    }) { vehiculo ->
+                        VehiculoCard(
+                            vehiculo = vehiculo,
+                            onEdit = { selectedVehiculo = vehiculo },
+                            onDelete = {
+                                db.collection("vehiculos").document(vehiculo.id)
+                                    .delete()
+                            }
+                        )
                     }
                 }
             }
         }
     )
+
+    selectedVehiculo?.let { vehiculo ->
+        AlertDialog(
+            onDismissRequest = { selectedVehiculo = null },
+            title = { Text("Opciones del vehículo") },
+            text = { Text("¿Qué acción deseas realizar?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        navController.navigate("EditarVehiculo/${vehiculo.id}")
+                        selectedVehiculo = null
+                    }
+                ) {
+                    Text("Editar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { selectedVehiculo = null }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun VehiculoCard(vehiculo: Vehiculo) {
+fun VehiculoCard(
+    vehiculo: Vehiculo,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Acción al hacer clic en el vehículo */ },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+            .clickable { /* Acción al hacer clic */ },
         elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(10.dp)
     ) {
@@ -153,9 +178,8 @@ fun VehiculoCard(vehiculo: Vehiculo) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Imagen del vehículo
             Image(
-                painter = painterResource(id = R.drawable.corolla), // Reemplaza con tu recurso de imagen
+                painter = painterResource(id = R.drawable.corolla),
                 contentDescription = "Vehículo",
                 modifier = Modifier
                     .size(60.dp)
@@ -165,31 +189,30 @@ fun VehiculoCard(vehiculo: Vehiculo) {
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Información del vehículo
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = vehiculo.nombre, style = MaterialTheme.typography.bodyMedium)
                 Text(text = vehiculo.matricula, fontSize = 14.sp, color = Color.Gray)
-                Text(text = vehiculo.combustible, fontSize = 14.sp, color = Color.Gray)
+                Text(text = "Plataforma: ${vehiculo.plataforma}", fontSize = 14.sp, color = Color.Gray)
+                Text(text = "Combustible: ${vehiculo.combustible}", fontSize = 14.sp, color = Color.Gray)
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Acciones
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector = Icons.Default.Brightness5, contentDescription = "Detalles")
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(imageVector = Icons.Default.Edit, contentDescription = "Editar")
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar")
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Editar")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
+                }
             }
         }
     }
 }
 
-// Modelo de datos del vehículo
 data class Vehiculo(
-    val nombre: String,
-    val matricula: String,
-    val combustible: String,
-    val horas: String
+    val id: String = "",
+    val nombre: String = "",
+    val matricula: String = "",
+    val plataforma: String = "",
+    val combustible: String = "",
+    val horas: String = ""
 )
