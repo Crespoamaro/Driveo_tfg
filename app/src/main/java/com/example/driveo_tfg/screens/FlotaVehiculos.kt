@@ -16,32 +16,49 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.driveo_tfg.R
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FlotaVehiculos(navController: NavHostController) {
     val yellowColor = Color(0xFFF7FF62)
     val db = FirebaseFirestore.getInstance()
-    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+    val user = auth.currentUser
     var vehiculos by remember { mutableStateOf<List<Vehiculo>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
-    var showDialog by remember { mutableStateOf(false) }
     var selectedVehiculo by remember { mutableStateOf<Vehiculo?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        db.collection("vehiculos")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                vehiculos = snapshot?.toObjects(Vehiculo::class.java) ?: emptyList()
+        user?.uid?.let { uid ->
+            db.collection("vehiculos").whereEqualTo("uid", uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) return@addSnapshotListener
+                    vehiculos = snapshot?.toObjects(Vehiculo::class.java) ?: emptyList()
+                }
+        }
+    }
+
+    fun eliminarVehiculo(id: String) {
+        db.collection("vehiculos").document(id)
+            .delete()
+            .addOnSuccessListener {
+                vehiculos = vehiculos.filter { it.id != id }  // Eliminamos de la lista
+            }
+            .addOnFailureListener { e ->
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Error al eliminar: ${e.message}")
+                }
             }
     }
 
@@ -122,14 +139,14 @@ fun FlotaVehiculos(navController: NavHostController) {
                         VehiculoCard(
                             vehiculo = vehiculo,
                             onEdit = { selectedVehiculo = vehiculo },
-                            onDelete = {
-                                db.collection("vehiculos").document(vehiculo.id)
-                                    .delete()
-                            }
+                            onDelete = { id -> eliminarVehiculo(id) }  // Llamamos a eliminarVehiculo
                         )
                     }
                 }
             }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         }
     )
 
@@ -163,7 +180,7 @@ fun FlotaVehiculos(navController: NavHostController) {
 fun VehiculoCard(
     vehiculo: Vehiculo,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: (String) -> Unit  // Ahora pasa el ID del vehículo
 ) {
     Card(
         modifier = Modifier
@@ -200,7 +217,7 @@ fun VehiculoCard(
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Editar")
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(onClick = { onDelete(vehiculo.id) }) {  // Llamamos a la función para eliminar
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
                 }
             }
@@ -214,5 +231,6 @@ data class Vehiculo(
     val matricula: String = "",
     val plataforma: String = "",
     val combustible: String = "",
-    val horas: String = ""
+    val horas: String = "",
+    val uid: String = ""
 )

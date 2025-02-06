@@ -17,16 +17,18 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Registro(navController: NavHostController, db: FirebaseFirestore) {
+fun Registro(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
 
     val yellowColor = Color(0xFFF7FF62)
 
@@ -127,25 +129,23 @@ fun Registro(navController: NavHostController, db: FirebaseFirestore) {
 
                     Button(
                         onClick = {
+                            errorMessage = null
                             if (email.isNotEmpty() && password.isNotEmpty() && confirmPassword.isNotEmpty()) {
                                 if (password == confirmPassword) {
-                                    val usuario = hashMapOf(
-                                        "correo" to email,
-                                        "contraseña" to password
-                                    )
-                                    db.collection("usuarios").add(usuario)
-                                        .addOnSuccessListener {
-                                            Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
-                                            navController.navigate("InicioSesion")
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Toast.makeText(context, "Error al guardar datos: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    auth.createUserWithEmailAndPassword(email, password)
+                                        .addOnCompleteListener { task ->
+                                            if (task.isSuccessful) {
+                                                Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
+                                                navController.navigate("InicioSesion")
+                                            } else {
+                                                errorMessage = task.exception?.message
+                                            }
                                         }
                                 } else {
-                                    Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
+                                    errorMessage = "Las contraseñas no coinciden"
                                 }
                             } else {
-                                Toast.makeText(context, "Por favor, completa todos los campos", Toast.LENGTH_SHORT).show()
+                                errorMessage = "Por favor, completa todos los campos"
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = yellowColor),
@@ -154,6 +154,15 @@ fun Registro(navController: NavHostController, db: FirebaseFirestore) {
                             .height(50.dp)
                     ) {
                         Text(text = "Registrarse", fontSize = 16.sp, color = Color.Black)
+                    }
+
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = errorMessage ?: "",
+                            color = Color.Red,
+                            fontSize = 14.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))

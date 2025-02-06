@@ -3,10 +3,10 @@ package com.example.driveo_tfg.screens
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,7 +25,9 @@ fun InicioSesion(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
 
     val yellowColor = Color(0xFFF7FF62)
 
@@ -98,18 +101,34 @@ fun InicioSesion(navController: NavHostController) {
 
                 Button(
                     onClick = {
+                        errorMessage = null
                         if (email.isNotEmpty() && password.isNotEmpty()) {
-                            // Simulación de inicio de sesión
-                            Toast.makeText(context, "Inicio de sesión simulado", Toast.LENGTH_SHORT).show()
-                            navController.navigate("FlotaVehiculos")
+                            auth.signInWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        Toast.makeText(context, "Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
+                                        navController.navigate("FlotaVehiculos")
+                                    } else {
+                                        errorMessage = task.exception?.message
+                                    }
+                                }
                         } else {
-                            Toast.makeText(context, "Por favor, completa los campos", Toast.LENGTH_SHORT).show()
+                            errorMessage = "Por favor, completa los campos"
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = yellowColor),
                     modifier = Modifier.fillMaxWidth(0.9f).height(50.dp)
                 ) {
                     Text(text = "Iniciar Sesión", fontSize = 16.sp, color = Color.Black)
+                }
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = errorMessage ?: "",
+                        color = Color.Red,
+                        fontSize = 14.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -126,5 +145,3 @@ fun InicioSesion(navController: NavHostController) {
         }
     )
 }
-
-

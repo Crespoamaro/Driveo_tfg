@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
@@ -19,6 +20,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AgregarEditarVehiculo(navController: NavHostController, vehiculoId: String? = null) {
     val db = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
+    val user = auth.currentUser
     var nombre by remember { mutableStateOf("") }
     var matricula by remember { mutableStateOf("") }
     var combustible by remember { mutableStateOf("") }
@@ -160,7 +163,8 @@ fun AgregarEditarVehiculo(navController: NavHostController, vehiculoId: String? 
                                     "matricula" to matricula,
                                     "combustible" to combustible,
                                     "plataforma" to plataforma,
-                                    "horas" to horas
+                                    "horas" to horas,
+                                    "uid" to (user?.uid ?: "")
                                 )
 
                                 if (vehiculoId.isNullOrEmpty()) {
@@ -179,7 +183,7 @@ fun AgregarEditarVehiculo(navController: NavHostController, vehiculoId: String? 
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = yellowColor)
                 ) {
-                    Text(text = if (vehiculoId == null) "Agregar" else "Guardar cambios", fontSize = 16.sp,color = Color.Black)
+                    Text(text = if (vehiculoId == null) "Agregar" else "Guardar cambios", fontSize = 16.sp, color = Color.Black)
                 }
             }
         }
