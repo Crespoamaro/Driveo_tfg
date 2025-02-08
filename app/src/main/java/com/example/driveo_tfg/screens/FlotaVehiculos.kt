@@ -150,7 +150,8 @@ fun FlotaVehiculos(navController: NavHostController) {
                         VehiculoCard(
                             vehiculo = vehiculo,
                             onEdit = { selectedVehiculo = vehiculo },
-                            onDelete = { vehiculoToDelete = vehiculo }
+                            onDelete = { vehiculoToDelete = vehiculo },
+                            onClick = { navController.navigate("VehiculoDetalle/${vehiculo.id}") }
                         )
                     }
                 }
@@ -218,12 +219,13 @@ fun FlotaVehiculos(navController: NavHostController) {
 fun VehiculoCard(
     vehiculo: Vehiculo,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Acción al hacer clic */ },
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(10.dp)
     ) {
