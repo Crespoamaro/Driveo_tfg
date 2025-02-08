@@ -1,13 +1,13 @@
 package com.example.driveo_tfg.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -25,6 +25,7 @@ import com.example.driveo_tfg.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,30 +37,40 @@ fun FlotaVehiculos(navController: NavHostController) {
     var vehiculos by remember { mutableStateOf<List<Vehiculo>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedVehiculo by remember { mutableStateOf<Vehiculo?>(null) }
+    var vehiculoToDelete by remember { mutableStateOf<Vehiculo?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    // Cargar vehículos desde Firestore
+    LaunchedEffect(user) {
         user?.uid?.let { uid ->
-            db.collection("vehiculos").whereEqualTo("uid", uid)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) return@addSnapshotListener
-                    vehiculos = snapshot?.toObjects(Vehiculo::class.java) ?: emptyList()
-                }
+            try {
+                val snapshot = db.collection("vehiculos").whereEqualTo("uid", uid).get().await()
+                val vehiculosList = snapshot.documents.mapNotNull { it.toObject(Vehiculo::class.java)?.apply { id = it.id } }
+                vehiculos = vehiculosList
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun eliminarVehiculo(id: String) {
-        db.collection("vehiculos").document(id)
-            .delete()
-            .addOnSuccessListener {
-                vehiculos = vehiculos.filter { it.id != id }  // Eliminamos de la lista
-            }
-            .addOnFailureListener { e ->
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Error al eliminar: ${e.message}")
+        if (id.isNotEmpty()) {
+            db.collection("vehiculos").document(id)
+                .delete()
+                .addOnSuccessListener {
+                    vehiculos = vehiculos.filter { it.id != id }
                 }
+                .addOnFailureListener { e ->
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Error al eliminar: ${e.message}")
+                    }
+                }
+        } else {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Error: ID de vehículo no válido")
             }
+        }
     }
 
     Scaffold(
@@ -139,7 +150,7 @@ fun FlotaVehiculos(navController: NavHostController) {
                         VehiculoCard(
                             vehiculo = vehiculo,
                             onEdit = { selectedVehiculo = vehiculo },
-                            onDelete = { id -> eliminarVehiculo(id) }  // Llamamos a eliminarVehiculo
+                            onDelete = { vehiculoToDelete = vehiculo }
                         )
                     }
                 }
@@ -174,13 +185,40 @@ fun FlotaVehiculos(navController: NavHostController) {
             }
         )
     }
+
+    vehiculoToDelete?.let { vehiculo ->
+        AlertDialog(
+            onDismissRequest = { vehiculoToDelete = null },
+            title = { Text("Eliminar vehículo") },
+            text = { Text("¿Estás seguro de que deseas eliminar este vehículo?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vehiculo.id?.let { id ->
+                            eliminarVehiculo(id)
+                            vehiculoToDelete = null
+                        }
+                    }
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { vehiculoToDelete = null }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun VehiculoCard(
     vehiculo: Vehiculo,
     onEdit: () -> Unit,
-    onDelete: (String) -> Unit  // Ahora pasa el ID del vehículo
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -217,7 +255,7 @@ fun VehiculoCard(
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Editar")
                 }
-                IconButton(onClick = { onDelete(vehiculo.id) }) {  // Llamamos a la función para eliminar
+                IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
                 }
             }
@@ -226,7 +264,7 @@ fun VehiculoCard(
 }
 
 data class Vehiculo(
-    val id: String = "",
+    var id: String? = null,
     val nombre: String = "",
     val matricula: String = "",
     val plataforma: String = "",
