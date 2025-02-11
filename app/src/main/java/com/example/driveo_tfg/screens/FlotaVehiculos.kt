@@ -40,6 +40,7 @@ fun FlotaVehiculos(navController: NavHostController) {
     var vehiculoToDelete by remember { mutableStateOf<Vehiculo?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    var showMenu by remember { mutableStateOf(false) }
 
     // Cargar vehículos desde Firestore
     LaunchedEffect(user) {
@@ -51,6 +52,13 @@ fun FlotaVehiculos(navController: NavHostController) {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    fun cerrarSesion() {
+        auth.signOut()
+        navController.navigate("InicioSesion") {
+            popUpTo("FlotaVehiculos") { inclusive = true }
         }
     }
 
@@ -78,11 +86,27 @@ fun FlotaVehiculos(navController: NavHostController) {
             TopAppBar(
                 title = {},
                 actions = {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Menú",
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
+                    Box {
+                        IconButton(onClick = { showMenu = !showMenu }) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menú",
+                                modifier = Modifier.padding(end = 16.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Cerrar sesión") },
+                                onClick = {
+                                    showMenu = false
+                                    cerrarSesion()
+                                }
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = yellowColor)
             )
